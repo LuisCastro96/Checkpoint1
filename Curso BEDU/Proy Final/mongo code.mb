@@ -1,0 +1,233 @@
+1.-De la tabla de partes obtén el nombre y la categoría de cada parte a la cual pertenecen
+[{$lookup: {
+  from: 'part_categories',
+  localField: 'part_cat_id',
+  foreignField: 'id',
+  as: 'pcat'
+}}, {$addFields: {
+  cat_obj: {$arrayElemAt:["$pcat",0]}
+}}, {$addFields: {
+  categoría: "$cat_obj.name"
+}}, {$project: {
+  part_num:1,
+  _id:0,
+  name:1,
+  categoría:1
+}}]
+2.-Del inventario de sets, obtén el nombre, el año y el tema de cada set
+[{$lookup: {
+  from: 'sets',
+  localField: 'set_num',
+  foreignField: 'set_num',
+  as: 'sets'
+}}, {$lookup: {
+  from: 'themes',
+  localField: 'sets.theme_id',
+  foreignField: 'id',
+  as: 'theme'
+}}, {$addFields: {
+  objset:{$arrayElemAt:["$sets",0]},
+  objtem:{$arrayElemAt:["$theme",0]}
+}}, {$addFields: {
+  nombre_set: "$objset.name",
+  año: "$objset.year",
+  tematica:"$objtem.name"
+}}, {$project: {
+  nombre_set:1,
+  año:1,
+  tematica:1,
+  _id:0
+}}]
+3.- De la tabla de colores cuenta cuantos colores son transparentes y cuantos no lo son
+[{
+    $group: {
+        _id: "$is_trans",
+        verd: {
+            $sum: 1
+        }
+    }
+}]
+4.- De la tabla inventarios en existencia (mayor a 2) obtén el nombre de los sets y a qué temática pertenecen
+[{$match: {
+  quantity:{$gt:2}
+}}, {$lookup: {
+  from: 'sets',
+  localField: 'set_num',
+  foreignField: 'set_num',
+  as: 'sets'
+}}, {$lookup: {
+  from: 'themes',
+  localField: 'sets.theme_id',
+  foreignField: 'id',
+  as: 'tematica'
+}}, {$sort: {
+  quantity: -1
+}}, {$addFields: {
+  objsets:{$arrayElemAt:["$sets",0]},
+  objtem:{$arrayElemAt:["$tematica",0]}
+}}, {$addFields: {
+  NombreDelset: "$objsets.name",
+  Tematica:"$objtem.name"
+}}, {$project: {
+  quantity:1,
+  NombreDelset:1,
+  Tematica:1
+
+  }}]
+5.-Del inventario de partes, obtenga el color de la parte, el rango rgb, la cantidad en stock y si se vende por separado.
+[{$lookup: {
+  from: 'colors',
+  localField: 'color_id',
+  foreignField: 'id',
+  as: 'col'
+}}, {$addFields: {
+  objrbg:{$arrayElemAt:["$col",0]}
+}}, {$addFields: {
+  RBG: "$objrbg.rgb",
+  color: "$objrbg.name"
+}}, {$project: {
+  rbg:1,
+  color:1,
+  is_spare:1,
+  _id:0,
+  quantity:1
+}}]
+6.-Obten las cantidades de sets disponibles, primero ordenando por año del más antiguo al más moderno y después por cantidad.
+[{$lookup: {
+  from: 'sets',
+  localField: 'set_num',
+  foreignField: 'set_num',
+  as: 'iset'
+}}, {$addFields: {
+  objset: {
+    $arrayElemAt: [
+      '$iset',
+      0
+    ]
+  }
+}}, {$addFields: {
+  Nombre: '$objset.name',
+  año:"$objset.year"
+}}, {$project: {
+  quantity: 1,
+  nombre:1,
+  año:1,
+  Nombre:1
+}}, {$sort: {
+  año:1,quantity:-1
+}}]
+7.-Consulta cuantas partes hay por categoría y ordénalas de mayor a menor
+[{$lookup: {
+  from: 'part_categories',
+  localField: 'part_cat_id',
+  foreignField: 'id',
+  as: 'pcat'
+}}, {$addFields: {
+  objcat:{$arrayElemAt:["$pcat",0]}
+}}, {$addFields: {
+  categoria:"$objcat.name"
+}}, {$group: {
+  _id: "$categoria",
+  NumeroPartes: {
+    $sum: 1
+  }
+}}, {$sort: {
+  NumeroPartes: -1
+}}]
+8.-Consulta de qué set son todas las piezas que se venden por separado y ordénalas de mayor a menor
+[{$match: {
+  is_spare: 't'
+}}, {$lookup: {
+  from: 'inventories',
+  localField: 'inventory_id',
+  foreignField: 'id',
+  as: 'inv'
+}}, {$lookup: {
+  from: 'sets',
+  localField: 'inv.set_num',
+  foreignField: 'set_num',
+  as: 'set'
+}}, {$addFields: {
+  obj: {
+    $arrayElemAt: [
+      '$set',
+      0
+    ]
+  }
+}}, {$addFields: {
+  Set: '$obj.name'
+}}, {$limit: 150}, {$group: {
+  _id: '$Set',
+  numero_Sets: {
+    $sum: 1
+  }
+}}, {$sort: {
+  numero_Sets: -1
+}}]
+9.- Consulta de qué set son todas las piezas que no se venden por separado y ordénalas de mayor a menor
+[{$match: {
+  is_spare: "f"
+}}, {$lookup: {
+  from: 'inventories',
+  localField: 'inventory_id',
+  foreignField: 'id',
+  as: 'inv'
+}}, {$lookup: {
+  from: 'sets',
+  localField: 'inv.set_num',
+  foreignField: 'set_num',
+  as: 'set'
+}}, {$addFields: {
+  obj: {$arrayElemAt:["$set",0]}
+}}, {$addFields: {
+  Set: "$obj.name"
+}}, {$limit: 150}, {$group: {
+  _id: "$Set",
+  numero_Sets: {
+    $sum:1
+  }
+}}, {$sort: {
+  numero_Sets: -1
+}}]
+10.- Crea una consulta empezando por la tabla partes de inventarios que incluya, el numero de parte, la cantidad, si se vende suelta, el color, el rgb, si es transparente, el set al que pertenece, el año del set y la temática.
+[{$lookup: {
+  from: 'colors',
+  localField: 'color_id',
+  foreignField: 'id',
+  as: 'col'
+}}, {$lookup: {
+  from: 'inventories',
+  localField: 'inventory_id',
+  foreignField: 'id',
+  as: 'inv'
+}}, {$lookup: {
+  from: 'sets',
+  localField: 'inv.set_num',
+  foreignField: 'set_num',
+  as: 'set'
+}}, {$lookup: {
+  from: 'themes',
+  localField: 'set.theme_id',
+  foreignField: 'id',
+  as: 'tem'
+}}, {$addFields: {
+  objcol: {$arrayElemAt:["$col",0]},
+  objset: {$arrayElemAt:["$set",0]},
+  objtem: {$arrayElemAt:["$tem",0]}
+}}, {$addFields: {
+  color: "$objcol.name",
+  rgb: "$objcol.rgb",
+  transparente: "$objcol.is_trans",
+  Set:"$objset.name",
+  año:"$objset.year",
+  tematica:"$objtem.name"
+}}, {$project: {
+  _id:0,
+  part_num:1,
+  color:1,
+  rgb:1,
+  transparente:1,
+  año:1,
+  Set:1,
+  tematica:1
+}}]

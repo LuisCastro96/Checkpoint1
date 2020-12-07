@@ -1,0 +1,20 @@
+[{$unwind: {
+  path: "$genres",
+
+}}, {$unwind: {
+  path:"$countries" ,
+
+  }}, {$group: {
+  _id: {pais:"$countries",genero:"$genres"},
+  peliculas: {
+    $sum:1
+  }
+}}, {$addFields: {
+  Pais: "$_id.pais",
+  Genero:"$_id.genero"
+}}, {$project: {
+  _id:0
+}}, {$sort: {
+  Pais: -1,
+  Genero:1
+}}]

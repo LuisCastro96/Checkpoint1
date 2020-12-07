@@ -1,0 +1,8 @@
+{
+  $and:[
+    {number_of_reviews:{$gte:50}},
+    {'review_scores.review_scores_rating':{$gte:80}},
+    {amenities:{$in:[/Ethernet/i]}},
+    {'address.country':/Brazil/i}]
+  
+}
